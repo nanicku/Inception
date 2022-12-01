@@ -1,0 +1,113 @@
+version: '3'
+
+services:
+  nginx:
+    container_name: nginx
+    build: ./requirements/nginx
+    networks:
+      - network
+    depends_on:
+      - wordpress
+    ports:
+      - 443:443
+    volumes:
+      - wp:/var/www/wordpress
+      - ./requirements/nginx/conf:/etc/nginx/http.d/
+      - ./requirements/nginx/tools:/etc/nginx/ssl/
+    restart: always
+
+  wordpress:
+    build: requirements/wordpress
+    container_name: wordpress
+    depends_on:
+      - mariadb
+    restart: always
+    networks:
+      - network
+    env_file:
+      - .env
+    volumes:
+      - wp:/var/www/wordpress
+
+  mariadb:
+    container_name: mariadb
+    build: ./requirements/mariadb
+    networks:
+      - network
+    ports:
+      - "3306:3306"
+    volumes:
+      - db:/var/lib/mysql
+    env_file:
+      - .env
+    restart: always
+
+  redis:
+    build: requirements/bonus/redis
+    container_name: redis
+    depends_on:
+      - wordpress
+    ports:
+      - "6379:6379"
+    networks:
+      - network
+    restart: always
+
+  vsftpd:
+    build: 
+      context: .
+      dockerfile: requirements/bonus/vsftpd/Dockerfile
+      args:
+        FTP_USR: ${FTP_USR}
+        FTP_PWD: ${FTP_PWD}
+    container_name: vsftpd
+    depends_on:
+      - wordpress
+    ports:
+      - "21:21"
+    env_file:
+      - .env
+    volumes:
+      - wp:/var/www/wordpress
+    networks:
+     - network
+    restart: always
+
+  adminer:
+    build: requirements/bonus/adminer
+    container_name: adminer
+    depends_on:
+      - mariadb
+    ports:
+      - "8080:8080"
+    networks:
+     - network
+    restart: always
+
+  website:
+    build:
+      context: .
+      dockerfile: requirements/bonus/website/Dockerfile
+    container_name: website
+    ports:
+      - "8081:8081"
+    restart: always
+
+networks:
+  network:
+    driver: bridge
+
+volumes:
+  db:
+    driver: local
+    driver_opts:
+      type: none
+      device: /home/mshad/data/mariadb
+      o: bind
+  
+  wp:
+    driver: local
+    driver_opts:
+      type: none
+      device: /home/mshad/data/wordpress
+      o: bind
